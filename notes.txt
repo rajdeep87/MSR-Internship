@@ -1,0 +1,181 @@
+Command to run VS with breakpoints in VS command prompt
+
+Step 1: C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\001\001.bpl /flags:test\regression\001\config /break
+Step 2: Set the breakpoint in the code by clicking on the margin along the side of the corresponding code line 
+Step 3: Click Debug --> Continue
+Step 4: To Step through each line including function call, press F11.
+Step 5: To step over skipping functions, press F10.
+
+https://msdn.microsoft.com/en-us/library/y740d9d3.aspx
+
+>> Command to print the program (in bpl) after various instrumentation steps and before calling BoogieVerify.verifier 
+C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\test0\main.bpl 
+/flags:test\regression\cex\config /trackAllVars /v:3 /printFinalProg:test\regression\test0\ir.bpl
+
+>> BoogieVerify.verifier is called from driver.cs Line 576
+   var rstatus = BoogieVerify.Verify(init, out err, true);
+
+>> Command to execute ONLY the Stratified inlining procedure (/si) on the Instrumented program. Note that the instrumented program 
+   is obtained from the /printFinalProg argument shown above.
+   C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\test0\ir.bpl /flags:test\regression\cex\config /trackAllVars /si /v:3
+
+>> Set recursion bound with /recursionBound:2 
+
+>> The config file says how many counterexample to return by setting cex:N
+
+>> /trackAllVars is used to block Hierarchical refinement loop in Corral
+
+>> Stratified inlining use function summary as assume(true) -- even when Houdini is used. 
+
+>> verbose > 2 prints the counterexample trace obtained from overapproximate query. It returns a 
+symbolic trace which just contains the name of the basic blocks. This means the whole basic block 
+is included in the trace. 
+
+>> Command to run the Backtrack based parallelization of the Corral algorithm (implemented by Akash)
+   C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\cex\loopassert.bpl /flags:test\regression\cex\config  
+   /trackAllVars /v:2 /newStratifiedInlining:split /di /doNotUseLabels
+
+>> OnModel() procedure in StratifiedInlining.cs maps the z3 model to the counterexample trace of program. 
+
+>> The over-approximate query simply replace the function call with assume(true). This means any global variable 
+like assertsPassed that this function modifies can have arbitrary value. 
+
+Example 1: 
+==========
+var x: int;
+
+procedure {:entrypoint} main()
+{
+   havoc x;
+   assert x ==  1;
+}
+
+C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\test0\main.bpl /flags:test\regression\cex\config /trackAllVars /v:2
+Warning: Using default recursion bound of 1
+Single threaded program detected
+Verifying program while tracking: {assertsPassed, x}
+Starting forward approach...
+  - underapprox
+    - check
+    - checked: Correct
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite main
+  - underapprox
+    - check
+    - checked: Errors
+--------- Stats ---------
+number of functions inlined: 1
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 3
+total time spent in Z3: (tick) 1601
+-------------------------
+Program has a potential bug: Starting forward approach...
+    ~ extend callsite main_trace_1
+  - underapprox
+    - check
+    - checked: Errors
+--------- Stats ---------
+number of functions inlined: 1
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 1
+total time spent in Z3: (tick) 20
+-------------------------
+True bug
+PersistentProgram(13,1): error PF5001: This assertion can fail
+
+main.bpl(6,1): error PF5001: This assertion can fail
+
+Execution trace:
+Format: (tid,k)  filename(line,col): blockName   (extra info)
+(1,0)    test\regression\test0\main.bpl(5,4): anon0
+(1,0)    test\regression\test0\main.bpl(5,4): anon0
+(1,0)    test\regression\test0\main.bpl(6,4): anon0  (ASSERTION FAILS assert x == 1;
+ )
+(1,0)    test\regression\test0\main.bpl(6,4): anon0  (Done)
+LOC on trace: 3
+Unique procs inlined: 1
+Total number of procs: 1
+LOC inlined: 0 out of 0
+Non-trivial procs: 0
+Trace length (LOC): 0
+Trace length (branches): {}
+
+Boogie verification time: 0.19 s
+Time spent reading-writing programs: 0.03 s
+
+Time spent checking a program (1): 0.31 s
+Time spent checking a path (1): 0.03 s
+
+Number of procedures inlined: 1
+Number of variables tracked: 2
+Verifying program while tracking: {assertsPassed, x}
+Starting forward approach...
+  - underapprox
+    - check
+    - checked: Correct
+  - overapprox
+    - check
+    - checked: Correct
+--------- Stats ---------
+number of functions inlined: 0
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 2
+total time spent in Z3: (tick) 86
+-------------------------
+Program has no bugs
+
+Boogie verification time: 0.21 s
+Time spent reading-writing programs: 0.03 s
+
+Time spent checking a program (2): 0.34 s
+Time spent checking a path (1): 0.03 s
+
+Number of procedures inlined: 0
+Number of variables tracked: 2
+Total Time: 0.6417966 s
+Total User CPU time: 0.625 s
+
+Query: SI algorithm may either return from an SAT Under-aproximate query or UNSAT over-approximate query. 
+However, if an Under-approximate query is UNSAT and this query did not contain any blocking procedure calls, 
+then SI algorithm can also return proving program as SAFE. This is demonstrated in test\regression\test1
+
+Akah Reply: True. It would save us one less inlining. 
+
+
+########## Meeting with Vincent #################
+Cloud build -- Visual Studio code
+Bash and batch -- if cygwin is configured correctly -- 
+
+Build configurations
+1> nmake -- just like make 
+2> MS build configurations -- Through Visual Studio (API)
+3> MSDN -- C# maps are called dictionary
+
+
+############### Running SDV regression using Corral #####################
+
+Results from Corral: Verification output : Correct means full verification, Proof means bounded verification.
+
+Flags to be used with Corral present in the following file:
+SdvBench/ITP_WDM/file_map.txt
+
+Old SDV results in following file:
+/MSR-Research/corral/SDV-regression/results.txt
+
+Command line flag interpretation for Corral:
+============================================
+/k is the context-switch bound (does not matter for sequential programs)
+/useProverEvaluate is how the Z3 model is queried for values of variables
+/sdv controls the outer loop for corral. It simplifies a bunch of things knowing that the input came from SDV
+
+TODO:
+1> Run Akash's backtracking search with Buggy and Correct procedures - With and without Houdini. 
+2> Run debugger to see the execution of the backtrack search
+
+IMPLEMENTATION:
+* Change the outer Hierarchical refinement loop and set it to MAX
