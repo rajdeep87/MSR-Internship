@@ -1,0 +1,25 @@
+\documentclass{article}
+
+\begin{document}
+
+\title{Stratified Inlining in Corral}
+\author{Rajdeep Mukherjee}
+
+\maketitle
+
+\section{Termination in Corral}
+Currently, Corral terminates in either of the following two conditions.
+\begin{enumerate}
+\item Satisfiable Under-approximate query proving that the program has bugs.
+\item Unsatisfiable Over-approximate query proving that the program is safe.
+\end{enumerate}
+
+Additionally, the procedure can also terminate if one of the following two conditions holds true.
+\begin{enumerate}
+\item Unsatisfiable Under-approximate query given that the query does not contain any blocking call sites.
+\item Satisfiable Over-approximate query given that the query does not contain any blocking call sites.
+\end{enumerate}
+
+The above optimisation would save us one solver query. 
+
+\end{document}
