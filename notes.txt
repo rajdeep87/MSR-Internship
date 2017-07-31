@@ -144,7 +144,7 @@ Query: SI algorithm may either return from an SAT Under-aproximate query or UNSA
 However, if an Under-approximate query is UNSAT and this query did not contain any blocking procedure calls, 
 then SI algorithm can also return proving program as SAFE. This is demonstrated in test\regression\test1
 
-Akah Reply: True. It would save us one less inlining. 
+Akash Reply: True. It would save us one less inlining. 
 
 
 ########## Meeting with Vincent #################
@@ -176,6 +176,8 @@ Command line flag interpretation for Corral:
 TODO:
 1> Run Akash's backtracking search with Buggy and Correct procedures - With and without Houdini. 
 2> Run debugger to see the execution of the backtrack search
+3> Write a proposal for Degree of freedom in the original algorithm
+
 
 IMPLEMENTATION:
 * Change the outer Hierarchical refinement loop and set it to MAX

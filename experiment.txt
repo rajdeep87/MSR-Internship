@@ -1,0 +1,294 @@
+
+
+Advantage of Splitting with Backtracking versus Non-backtracking
+================================================================
+var x: int;
+
+procedure foo()
+{
+   assert x ==  1;
+}
+
+procedure {:entrypoint} main()
+{
+   havoc x;
+   while(*) { 
+     call foo(); 
+   }
+}
+Running Sequential Corral on the following benchmark:
+=====================================================
+C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\cex\loopassert.bpl /flags:test\regression\cex\config  /trackAllVars /v:2
+Warning: Using default recursion bound of 1
+Single threaded program detected
+Verifying program while tracking: {assertsPassed, x}
+Starting forward approach...
+  - underapprox
+    - check
+    - checked: Correct
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite main
+  - underapprox
+    - check
+    - checked: Correct
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite main_loop_anon2_LoopHead
+  - underapprox
+    - check
+    - checked: Correct
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite foo
+  - underapprox
+    - check
+    - checked: Errors
+--------- Stats ---------
+number of functions inlined: 3
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 7
+total time spent in Z3: (tick) 1331
+-------------------------
+Program has a potential bug: Starting forward approach...
+    ~ extend callsite main_trace_1
+    ~ extend callsite foo_trace_1
+  - underapprox
+    - check
+    - checked: Errors
+--------- Stats ---------
+number of functions inlined: 2
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 1
+total time spent in Z3: (tick) 21
+-------------------------
+True bug
+PersistentProgram(11,1): error PF5001: This assertion can fail
+
+loopassert.bpl(5,1): error PF5001: This assertion can fail
+
+Execution trace:
+Format: (tid,k)  filename(line,col): blockName   (extra info)
+(1,0)    test\regression\cex\loopassert.bpl(10,4): anon0
+(1,0)    test\regression\cex\loopassert.bpl(10,4): anon0
+(1,0)    test\regression\cex\loopassert.bpl(11,4): anon2_LoopHead
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody  (CALL foo)
+(1,0)     test\regression\cex\loopassert.bpl(5,4): anon0
+(1,0)     test\regression\cex\loopassert.bpl(5,4): anon0  (ASSERTION FAILS assert x == 1;
+ )
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody  (RETURN from foo )
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody  (Done)
+LOC on trace: 7
+Unique procs inlined: 1
+Total number of procs: 2
+LOC inlined: 0 out of 0
+Non-trivial procs: 0
+Trace length (LOC): 0
+Trace length (branches): {}
+
+Boogie verification time: 0.20 s
+Time spent reading-writing programs: 0.02 s
+
+Time spent checking a program (1): 0.33 s
+Time spent checking a path (1): 0.03 s
+
+Number of procedures inlined: 3
+Number of variables tracked: 2
+Verifying program while tracking: {assertsPassed, x}
+Starting forward approach...
+  - underapprox
+    - check
+    - checked: Correct
+  - overapprox
+    - check
+    - checked: Correct
+--------- Stats ---------
+number of functions inlined: 0
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 2
+total time spent in Z3: (tick) 41
+-------------------------
+Program has no bugs
+
+Boogie verification time: 0.22 s
+Time spent reading-writing programs: 0.02 s
+
+Time spent checking a program (2): 0.36 s
+Time spent checking a path (1): 0.03 s
+
+Number of procedures inlined: 0
+Number of variables tracked: 2
+Total Time: 0.6675043 s
+Total User CPU time: 0.5625 s
+
+serenum_completerequest_0
+C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\cex\loopassert.bpl /flags:test\regression\cex\config  /trackAllVars /v:2 /newStratifiedInlining:split /di /doNotUseLabels
+Warning: Using default recursion bound of 1
+Single threaded program detected
+Verifying program while tracking: {assertsPassed, x}
+Starting forward approach...
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite main
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite main_loop_anon2_LoopHead
+>>> Pushing Block(main_loop_anon2_LoopHead, 1, 0, 3, 2)
+  - overapprox
+    - check
+    - checked: Correct
+>>> Pop
+>>> Pushing Must-Reach(main_loop_anon2_LoopHead)
+  - overapprox
+    - check
+    - checked: Errors
+    ~ extend callsite foo
+  - overapprox
+    - check
+    - checked: Errors
+Time spent taking decisions: 0.01 s
+SplitSearch: 0.06       0.05    0.05    0.05    0.05    0.05    0.05    0.05    0.05    0.05    0.05    0.05    0.05
+0.05    0.05    0.05
+Time spent inside DI: 0.00 sec
+Tree size: 4
+--------- Stats ---------
+number of functions inlined: 3
+number of backtracking: 0
+total number of assertions in Z3 stack: 1
+total number of Z3 calls: 5
+total time spent in Z3: (tick) 1117
+-------------------------
+Program has a potential bug: Starting forward approach...
+    ~ extend callsite main_trace_1
+    ~ extend callsite foo_trace_1
+  - underapprox
+    - check
+    - checked: Errors
+--------- Stats ---------
+number of functions inlined: 2
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 1
+total time spent in Z3: (tick) 23
+-------------------------
+True bug
+PersistentProgram(11,1): error PF5001: This assertion can fail
+
+loopassert.bpl(5,1): error PF5001: This assertion can fail
+
+Execution trace:
+Format: (tid,k)  filename(line,col): blockName   (extra info)
+(1,0)    test\regression\cex\loopassert.bpl(10,4): anon0
+(1,0)    test\regression\cex\loopassert.bpl(10,4): anon0
+(1,0)    test\regression\cex\loopassert.bpl(11,4): anon2_LoopHead
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody  (CALL foo)
+(1,0)     test\regression\cex\loopassert.bpl(5,4): anon0
+(1,0)     test\regression\cex\loopassert.bpl(5,4): anon0  (ASSERTION FAILS assert x == 1;
+ )
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody  (RETURN from foo )
+(1,0)    test\regression\cex\loopassert.bpl(12,6): anon2_LoopBody  (Done)
+LOC on trace: 7
+Unique procs inlined: 1
+Total number of procs: 2
+LOC inlined: 0 out of 0
+Non-trivial procs: 0
+Trace length (LOC): 0
+Trace length (branches): {}
+
+Boogie verification time: 0.27 s
+Time spent reading-writing programs: 0.02 s
+
+Time spent checking a program (1): 0.40 s
+Time spent checking a path (1): 0.04 s
+
+Number of procedures inlined: 3
+Number of variables tracked: 2
+Verifying program while tracking: {assertsPassed, x}
+Starting forward approach...
+    ~ extend callsite main
+    ~ extend callsite main_loop_anon2_LoopHead
+    ~ extend callsite foo
+>>> Pushing Block(foo, 1, 0, 4, 3)
+  - overapprox
+    - check
+    - checked: Correct
+>>> Pop
+>>> Pushing Must-Reach(foo)
+  - overapprox
+    - check
+    - checked: Correct
+>>> Pop
+Time spent taking decisions: 0.01 s
+SplitSearch: 0.01       0.01    0.01    0.01    0.01    0.01    0.01    0.01    0.01    0.01    0.01    0.01    0.01
+0.01    0.01    0.01
+Time spent inside DI: 0.00 sec
+Tree size: 4
+--------- Stats ---------
+number of functions inlined: 3
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 2
+total time spent in Z3: (tick) 39
+-------------------------
+Program has no bugs
+Reached recursion bound of 1
+
+Boogie verification time: 0.31 s
+Time spent reading-writing programs: 0.02 s
+
+Time spent checking a program (2): 0.45 s
+Time spent checking a path (1): 0.04 s
+
+Number of procedures inlined: 3
+Number of variables tracked: 2
+Total Time: 0.7477872 s
+Total User CPU time: 0.734375 s
+
+** For the simple program above, backtrack based parallelization approach needed 5 z3 calls versus 7 z3 calls needed by serial approach. 
+
+** How to terminate Corral after first counterexample.
+
+** What IR is boogie translated to ? How are these additional call sites created -- callsite main_loop_anon2_LoopHead, callsite main_trace_1, callsite foo_trace_1 ?
+ 
+** 4 implementations --[0] foo, [1] main, [2] main_SeqInstr, [3] main_loop_anon2_LoopHead
+
+** Error trace from P_over -- where (#Line) to find in the code, 
+
+
+Running SDV Regression Using Corral
+===================================
+
+Benchmark Name:  SDV-regression\SdvBench\itp_wdm\serenum_completerequest_0.bpl
+Benchmark with longest Time : 1987.38 sec
+
+>bin\Debug\corral.exe SDV-regression\SdvBench\ITP_WDM\serenum_completerequest_0.bpl   /k:3 /recursionBound:12 /main:main 
+/useProverEvaluate /sdv /recursionBound:3 /catchAll /runHoudini /dislike:Mem_T.Data1__GUID /dislike:Mem_T.Data2__GUID 
+/dislike:Mem_T.Data3__GUID /dislike:Mem_T.Data4__GUID /ann:LB:Serenum_GetDevSerialNo_loop_L1:8 /runHoudini:0 
+/memLimit:1000 /newStratifiedInlining:split
+
+Boogie verification time: 645.06 s
+Time spent reading-writing programs: 2.69 s
+
+Time spent checking a program (0): 645.21 s
+Time spent checking a path (1): 1.44 s
+
+CLoops Time: 0.00 s
+Num refinements: 2
+Number of procedures inlined: 976
+VC Size: 357653
+Final tracked vars: {alloc, SLAM_guard_S_0, yogi_error, s, forward_state, Mem_T.CompletionRoutine__IO_STACK_LOCATION}
+Total Time: 652.63 s
+Total User CPU time: 653.55 s
+No bugs found
+Proof not computed
+
