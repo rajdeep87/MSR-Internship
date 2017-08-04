@@ -40,6 +40,28 @@ is included in the trace.
 >> The over-approximate query simply replace the function call with assume(true). This means any global variable 
 like assertsPassed that this function modifies can have arbitrary value. 
 
+>> Command to run Corral with NO underapproximation: /newStratifiedInlining:nounder
+
+>> The stratifiedInlining algorithm with alternation of over and under approximation has to do 
+pop() from z3 after the underapproximate query since an underapproximate query blocks a callsite. 
+The popping can be inefficient sometimes and may lead to more time. 
+
+>> The counterexample is shown in terms of basic blocks. The call sites that appear in those 
+basic blocks are chosen to be inlined next.
+
+>> How to assert that a basic block is taken (only happens with split style stratified inlining) 
+    -- follow AssertMustReach procedure
+
+>> svc.mustReachVar gives the list of basic blocks for the callsite which we MUST want to reach
+
+>> bin\Debug\corral.exe test\regression\test3\main.bpl /flags:test\regression\test3\config  
+/trackAllVars /v:3 /newStratifiedInlining:mustreach /di /doNotUseLabels /break
+
+>> A result of Underapproximate query (if unsat) never leads to extending any call site. 
+It is always followed by an over-approximate query. So, underapproximation (if satisfiable) 
+is always used for earlier bug detection. However, for safe programs, underapproximate queries 
+are an overhead since it increases Z3 query as well as leads to frequent Pops which is expensive.
+
 Example 1: 
 ==========
 var x: int;
@@ -181,3 +203,50 @@ TODO:
 
 IMPLEMENTATION:
 * Change the outer Hierarchical refinement loop and set it to MAX
+
+
+Queries:
+1> Does /newStratifiedInlining:split always have to be run with /di /doNotUseLabels option ?
+2> Why does /newStratifiedInlining:split /di start with Over-approx and not Under-approx ?
+
+Akash Response:
+The SplitSearch implementation requires the /di flag, but only because it needs the call tree data structure that DI maintains. It doesn't do dag inlining 
+C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\test3\main.bpl /flags:test\regression\test3\config  
+/trackAllVars /v:3 /newStratifiedInlining:split /di /doNotUseLabels
+
+Query: Why are every query over-approximate in Splitsearch technique -- Ran on test3 ?
+    Main
+    | |
+ ---  --- 
+ |       |
+foo     bar
+ |       |
+top     top
+
+
+>>> Pushing Block(foo, 1, 0, 3, 2)
+  - overapprox
+    - check
+    - checked: Correct
+>>> Pop
+>>> Pushing Must-Reach(foo)
+ >>> Pushing Block(top, 1, 0, 6, 5)
+  - overapprox
+    - check
+    - checked: Correct
+ >>> Pop
+ >>> Pushing Must-Reach(top)
+  - overapprox
+    - check
+    - checked: Correct
+ >>> Pop
+>>> Pop
+
+TODO: 
+Figure out the VC for MustReach basic block for single procedure and for inter-precedural calls.
+MustReach can be done at the level of basic blocks as well as call site. 
+
+
+       Implementation
+===========================
+> Functions to look for -- private StratifiedVC Expand(StratifiedCallSite scs, string name, bool DoSubst, bool dontMerge)

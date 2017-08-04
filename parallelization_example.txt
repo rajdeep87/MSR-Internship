@@ -1,0 +1,36 @@
+procedure main();
+  free requires assertsPassed;
+  modifies x, assertsPassed;
+
+
+
+implementation main()
+{
+
+  anon0:
+    call {:si_unique_call 2} foo();
+    goto SeqInstr_10, SeqInstr_11;
+
+  SeqInstr_11:
+    assume assertsPassed;
+    goto SeqInstr_12;
+
+  SeqInstr_12:
+    call {:si_unique_call 3} bar();
+    goto SeqInstr_13, SeqInstr_14;
+
+  SeqInstr_14:
+    assume assertsPassed;
+    goto SeqInstr_15;
+
+  SeqInstr_15:
+    return;
+
+  SeqInstr_13:
+    assume !assertsPassed;
+    return;
+
+  SeqInstr_10:
+    assume !assertsPassed;
+    return;
+}
