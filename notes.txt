@@ -269,6 +269,7 @@ Parallelization infrastructure
 It is easier to use the thread pool provided by the .NET Framework through the ThreadPool class. 
 https://www.dotnetperls.com/threadpool
 https://msdn.microsoft.com/en-us/library/3dasc8as(v=vs.80).aspx
+https://www.codeproject.com/articles/548865/create-a-custom-threadpool-in-csharp
 
 Query:
 1> How do we create a new Z3 instance in every thread. 
