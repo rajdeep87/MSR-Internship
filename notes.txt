@@ -276,4 +276,5 @@ Query:
 If I create this instance and then invoke the inlined procedure, does the push and pop inside that procedure uses this z3 instance ?
 Should I pass ProverInterface or StratifiedInlining object to create separate VC generation data structures and separate prover instances. 
 The signature of the method is : ThreadPool.QueueUserWorkItem(Compute_FwdNoUnder, prover1);
+2> What is the object when we call push(); Does it only push prover.assert() statements. 
  
