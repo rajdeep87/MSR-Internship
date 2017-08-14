@@ -1,12 +1,47 @@
 \documentclass{article}
 
+
+\usepackage{scalerel}
+\usepackage{import}
+\usepackage{times}
+\usepackage{multirow}
+\usepackage{microtype}
+\usepackage{array}
+\usepackage{galois}
+\usepackage{graphicx,wrapfig}
+\usepackage[noadjust]{cite}
+\usepackage{tikz}
+\usetikzlibrary{plotmarks}
+\usepackage{pgfplotstable}
+\usepackage{filecontents}
+\usepackage{pgfplots}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{stmaryrd}
+\usepackage{color}
+\usepackage{listings}
+\usepackage{verbatim}
+\usepackage{psfrag}
+\usepackage{epsfig}
+\usepackage{wasysym} 
+%\usepackage{subfigure}
+\usepackage{paralist}
+%\usepackage{dingbat}
+\usepackage[algo2e,linesnumbered,ruled,lined]{algorithm2e}
+\usepackage{hyperref}
+\usepackage[subnum]{cases}
+\makeatother
+
+
+\newcommand{\Omit}[1]{}
 \begin{document}
 
-\title{Stratified Inlining in Corral}
+\title{Parallelizing Corral}
 \author{Rajdeep Mukherjee}
 
 \maketitle
-
+\Omit{
 \section{Termination in Corral}
 Currently, Corral terminates in either of the following two conditions.
 \begin{enumerate}
@@ -21,5 +56,219 @@ Additionally, the procedure can also terminate if one of the following two condi
 \end{enumerate}
 
 The above optimisation would save us one solver query. 
+}
+\section{Parallelization Framework}
+Algorithm~\ref{scheduler} presents a generic procedure for parallelizing jobs 
+in a multi-threaded environment. Here, we assume that a thread can be in one of the 
+four states -- {FREE, CONSISTENT, INCONSISTENT, COPY}. A thread is \emph{FREE}
+if no job has been delegated to the thread. A thread is \emph{CONSISTENT} if 
+a job assigned to it returns a consistent result, else we consider a thread 
+\emph{INCONSISTENT}. The notion of consistency depends on the underlying task 
+assigned to it. Whereas, a thread is in \emph{COPY} state if it simply replicates 
+the action of another thread.  The idea here is that we want every thread in the 
+system to perform some action and atleast one thread should copy the action of a 
+consistent thread at any given point in time. Ofcourse, the copy action can only 
+be performed if there are more threads than the number of unique jobs in the system.
+
+
+Algorithm~\ref{delegate}, \texttt{delegateJobsToThreads}$(\mathcal{T}, \mathcal{J},$ copyStatus$)$, 
+performs the function of delegating jobs to threads. The function \texttt{getIdleThread()} returns  
+one thread from the thread pool $\mathcal{T}$ and decrements the count of available threads. 
+Similarly, the function \texttt{getJobFromQueue()} returns one job from the job queue $\mathcal{J}$ 
+and decrements the count of pending jobs. The function \texttt{submitJob$(j,t)$} executes job $j$ 
+in thread $t$ and returns an array $\mathcal{TS}$ that stores the state of each thread upon execution. 
+Depending on the variable \texttt{copyStatus}, algorithm~\ref{delegate} copies an activity of a 
+thread using the function \text{copyThreadActivity}.  If there are no free threads to execute jobs 
+in $\mathcal{J}$, then the function \texttt{monitorThread} is called to check the status of each thread. 
+If this function finds an \emph{INCONSISTENT} of \emph{FREE} thread, it returns the thread to the thread 
+pool $\mathcal{T}$.  Algorithm~\ref{delegate} terminates when all the jobs have been processed and all 
+thread are in \emph{FREE} state. 
+%
+%
+%
+\begin{algorithm2e}[t]
+\DontPrintSemicolon
+\SetKw{return}{return}
+\SetKw{continue}{continue}
+\SetKwRepeat{Do}{do}{while}
+\SetKwData{conflict}{conflict}
+\SetKwData{safe}{safe}
+\SetKwData{sat}{sat}
+\SetKwData{unsafe}{unsafe}
+\SetKwData{unknown}{unknown}
+\SetKwData{true}{true}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
+\SetKwFor{Loop}{Loop}{}{}
+\SetKw{KwNot}{not}
+\begin{small}
+	\Input{Thread Pool $\mathcal{T}$}
+	\Output{Schedule jobs to Idle threads in $\mathcal{T}$}
+	$\mathcal{T} \leftarrow \{\text{Fixed set of threads}\}$ \;
+	\tcc{An array $\mathcal{TS}$ of thread status that is initialized to FREE}
+	$\mathcal{TS} \leftarrow \{\text{All entries initialized to FREE}\}$ \;
+	\tcc{Queue that contains all incoming Jobs}
+	$\mathcal{J} \leftarrow \emptyset$ \;
+	\While {$\text{jobs to execute}$} {
+	  $j \leftarrow \text{getNewJobs()}$ \;
+	  $\mathcal{J} \leftarrow \text{enqueue}(j)$ \;
+          \If {$|\mathcal{J}| > |\mathcal{T}|$} 
+	  {
+		  $\mathcal{TS}$ = delegateJobsToThreads$(\mathcal{J}, \mathcal{T}, \mathcal{TS}, 0)$ \;
+	  }
+	  \Else 
+	  {
+		  $\mathcal{TS}$ = delegateJobsToThreads$(\mathcal{J}, \mathcal{T}, \mathcal{TS}, 1)$ \;
+	  }
+        }
+	\tcc{wait until all threads are free}
+	\While {checkFreeThreads$(\mathcal{T},\mathcal{TS}) \neq 1$} 
+           \continue
+	\return \;
+\end{small}
+	\caption{parallelize$(\mathcal{T})$
+	\label{scheduler}}
+\end{algorithm2e}
+%
+%
+%
+\begin{algorithm2e}[t]
+\DontPrintSemicolon
+\SetKw{return}{return}
+\SetKw{continue}{continue}
+\SetKwRepeat{Do}{do}{while}
+\SetKwData{conflict}{conflict}
+\SetKwData{safe}{safe}
+\SetKwData{sat}{sat}
+\SetKwData{unsafe}{unsafe}
+\SetKwData{unknown}{unknown}
+\SetKwData{true}{true}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
+\SetKwFor{Loop}{Loop}{}{}
+\SetKw{KwNot}{not}
+\begin{small}
+	\Input{Thread Pool $\mathcal{T}$, Job Queue $\mathcal{Q}$, Thread status array $\mathcal{TS}$, copyStatus = $\{0,1\}$}
+	\Output{%Schedule jobs in $\mathcal{J}$ to Idle threads in $\mathcal{T}$
+		An updated array $\mathcal{TS}$ where each thread can be of type $\{\text{CONSISTENT, INCONSISTENT, COPY, FREE}\}$}
+	\While { $\mathcal{J} \neq \emptyset$} 
+	{
+	  \If{$\mathcal{T} \neq \emptyset$} {
+	    $t \leftarrow$ getIdleThread$(\mathcal{T})$ \;
+	    $j \leftarrow$ getJobFromQueue$(\mathcal{J})$ \;
+	    $\mathcal{TS}[|\mathcal{T}|]$ = submitJob$(t,j)$ \;
+	    \If {$\text{copyStatus} = 1$} 
+	    {
+	       \If {$\mathcal{T} \neq \emptyset$} {
+	       $t_{c} \leftarrow$ getIdleThread$(\mathcal{T})$ \;
+	       copyThreadActivity$(t, t_c)$ \;
+	       $\mathcal{TS}[|\mathcal{T}|]$ = COPY \;
+	       }
+	       \Else {
+	         \continue \;  	       
+	       }
+             }   
+	  }
+	  \Else {
+		  $\mathcal{T} \leftarrow$ monitorThread$(\mathcal{T}, \mathcal{TS})$ \;		  
+	    \continue \;  	       
+	  }
+	}
+	\return $\mathcal{TS}$ 
+\end{small}
+	\caption{delegateJobsToThreads$(\mathcal{T}, \mathcal{J}, \mathcal{TS}$ copyStatus$)$
+	\label{delegate}}
+\end{algorithm2e}
+%
+%
+%
+\begin{algorithm2e}[t]
+\DontPrintSemicolon
+\SetKw{return}{return}
+\SetKw{continue}{continue}
+\SetKwRepeat{Do}{do}{while}
+\SetKwData{conflict}{conflict}
+\SetKwData{safe}{safe}
+\SetKwData{sat}{sat}
+\SetKwData{unsafe}{unsafe}
+\SetKwData{unknown}{unknown}
+\SetKwData{true}{true}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
+\SetKwFor{Loop}{Loop}{}{}
+\SetKw{KwNot}{not}
+\begin{small}
+	\Input{Thread Pool $\mathcal{T}$, Thread status array $\mathcal{TS}$}
+	\Output{Updated thread pool $\mathcal{T}$}
+        
+	poolSize = $|\mathcal{T}|$ \;
+	\While { $\text{poolSize} \neq 0$} 
+	{
+		\If { $\mathcal{TS}[\text{poolSize}] = \{ \text{CONSISTENT, COPY} \}$ } 
+	     \continue 
+	  \ElseIf { $\mathcal{TS}[\text{poolSize}] = \{ \text{INCONSISTENT, FREE} \}$ } 
+	  {
+		  $t \leftarrow \mathcal{TS}[\text{poolsize}]$ \; 
+	     $\mathcal{T} \leftarrow \text{submitThread}(t)$ \;      	    
+          }
+	  \Else 
+	  {
+             throw $ERROR$ \;
+	  }
+          poolSize $= $ poolSize $- 1$ \;
+	}
+	\return $\mathcal{T}$ \;
+
+\end{small}
+	\caption{monitorThread$(\mathcal{T}, \mathcal{TS})$
+	\label{monitor}}
+\end{algorithm2e}
+%
+%
+%
+\begin{algorithm2e}[t]
+\DontPrintSemicolon
+\SetKw{return}{return}
+\SetKw{continue}{continue}
+\SetKwRepeat{Do}{do}{while}
+\SetKwData{conflict}{conflict}
+\SetKw{break}{break}
+\SetKwData{safe}{safe}
+\SetKwData{sat}{sat}
+\SetKwData{unsafe}{unsafe}
+\SetKwData{unknown}{unknown}
+\SetKwData{true}{true}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
+\SetKwFor{Loop}{Loop}{}{}
+\SetKw{KwNot}{not}
+\begin{small}
+	\Input{Thread Pool $\mathcal{T}$, thread status array $\mathcal{TS}$}
+	\Output{return 1 if all threads in $\mathcal{T}$ are FREE, else return 0}
+        freeThreads $\leftarrow 1$ \;
+	poolSize = $|\mathcal{T}|$ \;
+	\While { $\text{poolSize} \neq 0$} 
+	{
+		\If { $\mathcal{TS}[\text{poolSize}] \neq \{ \text{FREE} \}$ } 
+	  {
+             freeThreads $\leftarrow 0$ \;
+	     \break \;
+	  }
+	}
+	\If {\text{freeThreads} $= 1$} 
+	{ 
+	   \return 1 \;
+	}
+	\Else 
+	{
+           \return 0 \;
+        }
+\end{small}
+	\caption{checkFreeThreads$(\mathcal{T}, \mathcal{TS})$
+	\label{freethreadchecker}}
+\end{algorithm2e}
+%
+%
+%
 
 \end{document}
