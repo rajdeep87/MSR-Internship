@@ -277,4 +277,64 @@ If I create this instance and then invoke the inlined procedure, does the push a
 Should I pass ProverInterface or StratifiedInlining object to create separate VC generation data structures and separate prover instances. 
 The signature of the method is : ThreadPool.QueueUserWorkItem(Compute_FwdNoUnder, prover1);
 2> What is the object when we call push(); Does it only push prover.assert() statements. 
+
+3> Why do Corral need to expand foo() and bar() even though none of them modifies x. 
+In this case, the inlining is not property based. However, if the statement "x=1;assert x!= 1"
+is before the call to foo() and bar(), then corral can successfully prove it unsafe without ]
+expanding foo and bar.
+
  
+procedure top()
+modifies z;
+{
+   z := 1;
+}
+
+procedure foo()
+modifies z,y;
+{
+   y := 1;
+   call top();
+}
+
+procedure bar()
+modifies z;
+{
+   z := 1;
+   call top();
+}
+
+
+procedure {:entrypoint} main()
+modifies x,y,z;
+{
+   call foo();
+   call bar();
+   x := 1;
+   assert x !=  1;
+}
+
+
+Meeting on 18th August
+======================
+1> Run _fail cases with SI and split-search and report number of procedures inlined and time taken 
+2> Give high level algorithm to Akash and Subhajit
+High level algorithm
+=====================
+ pick c in Calltree
+ EnqueueJob(mustReach, c)
+ execute block(c)
+ result = continue SI
+ if(result == UNSAT) 
+   Dequeue job from Queue and work on it.  
+
+3> The aim is NOT to reduce the total number of inlinings, but to split the z3 query using 
+threading.  Compared to normal SI, the split search always has simplied z3 queries. 
+
+4> In UNSAFE cases, the normal SI always does FULL inlining of all procedure calls.
+5> Push in z3 is like backtracking point.
+
+Inform Akash
+=============
+Decisions are made during the run of the Stratified Inlining and not upfront. 
+

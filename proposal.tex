@@ -56,7 +56,7 @@ Additionally, the procedure can also terminate if one of the following two condi
 \end{enumerate}
 
 The above optimisation would save us one solver query. 
-}
+
 \section{Parallelization Framework}
 Algorithm~\ref{scheduler} presents a generic procedure for parallelizing jobs 
 in a multi-threaded environment. Here, we assume that a thread can be in one of the 
@@ -270,5 +270,129 @@ thread are in \emph{FREE} state.
 %
 %
 %
+}
+
+\begin{algorithm2e}[t]
+\DontPrintSemicolon
+\SetKw{return}{return}
+\SetKw{continue}{continue}
+\SetKwRepeat{Do}{do}{while}
+\SetKwData{conflict}{conflict}
+\SetKwData{safe}{safe}
+\SetKwData{sat}{sat}
+\SetKwData{unsafe}{unsafe}
+\SetKwData{unknown}{unknown}
+\SetKwData{true}{true}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
+\SetKwFor{Loop}{Loop}{}{}
+\SetKw{KwNot}{not}
+\begin{small}
+	\Input{Thread Pool $\mathcal{T}$, Program $\mathcal{P}$, starting procedure $f$}
+	\Output{SAT or UNSAT}
+	$\mathcal{T} \leftarrow \{\text{Fixed set of threads}\}$ \;
+	\tcc{An array $\mathcal{TS}$ of thread status that is initialized to FREE}
+	$\mathcal{TS} \leftarrow \{\text{All entries initialized to FREE}\}$ \;
+	\tcc{Queue that contains all incoming Jobs}
+	$\mathcal{J} \leftarrow \emptyset$ \;
+        
+        
+	Thread tid = new thread(newThreadStart(StratifiedInlining($\mathcal{P},f$))) \;
+	tid.start() \;
+	$\mathcal{TS}[tid] \leftarrow$ CONSISTENT \;
+	
+	\tcc{Create COPY threads}
+	\While{$|\mathcal{T}| > 1$} {
+	  newID = copyThreadActivity($\mathcal{T}, \mathcal{TS}$, tid) \;
+	  $\mathcal{TS}[newID] \leftarrow$ COPY \;
+	}
+
+	\tcc{wait until all threads are free}
+	\While {checkFreeThreads$(\mathcal{T},\mathcal{TS}) \neq 1$} 
+           \continue
+	\return \;
+\end{small}
+	\caption{parallelize$(\mathcal{T})$
+	\label{scheduler}}
+\end{algorithm2e}
+
+
+\begin{algorithm2e}[t]
+\DontPrintSemicolon
+\SetKw{return}{return}
+\SetKw{continue}{continue}
+\SetKwRepeat{Do}{do}{while}
+\SetKwData{conflict}{conflict}
+\SetKwData{safe}{safe}
+\SetKwData{sat}{sat}
+\SetKwData{unsafe}{unsafe}
+\SetKwData{unknown}{unknown}
+\SetKwData{break}{break}
+\SetKwData{true}{true}
+\SetKwInOut{Input}{input}
+\SetKwInOut{Output}{output}
+\SetKwFor{Loop}{Loop}{}{}
+\SetKw{KwNot}{not}
+\begin{small}
+	\Input{Program $\mathcal{P}$, starting procedure $f$}
+	%\Output{Updated thread pool $\mathcal{T}$}
+	C $\leftarrow$ open-call-sites($\mathcal{P}$) \;
+	r $\leftarrow$ MAX \;
+	\While {true} 
+	{
+		P' $\leftarrow \mathcal{P}[\forall_{c \in C'} c \leftarrow$ assume false] \;
+		\If {check(P') = BUG($\rho$)} 
+		{
+			return BUG($\rho$) \;
+		}
+		C$_1$,C$_2$ := split-on-cost(C, r) \;
+		P' $\leftarrow \mathcal{P}[\forall_{c \in C_1} c \leftarrow$ summary($c$), 
+		$\forall_{c \in C_2} c \leftarrow$ assume false] \;
+		result $\leftarrow$ check(P') \;
+		\If {check = CORRECT $\wedge$ C$_2 = \emptyset$} 
+		{
+			return CORRECT \;
+		}
+		\If {check = CORRECT $\wedge$ C$_2 \neq \emptyset$} 
+		{
+			\break \;
+		}
+                result = BUG($\rho$) \;
+
+		\tcc{Spawn new threads or use COPY thread to split blocking and Must Reach query}
+	        \Omit{
+	        methodsToInline $\leftarrow$ number of procedure in $\rho$ to be inlined \;
+		\If {number of COPY threads in $\mathcal{TS} \geq$ 2*methodsToInline} 
+		{
+                  \For {$c \in \rho$} 
+		  {
+			  \tcc{check block and must reach query in each copy thread}
+			  \For{COPY thread $cid, cid' \in \mathcal{TS}$} {
+		            \tcc{block query}
+			    P'' $\leftarrow \mathcal{P'}$[Block(c)] \;
+                            $\mathcal{TS}$[cid] $\leftarrow$ check(P'');
+		            
+			    \tcc{must reach query}
+			    P'' $\leftarrow \mathcal{P'}$[Must-Reach(c)] \;
+                            $\mathcal{TS}$[cid'] $\leftarrow$ check(P'');
+			  }
+		  }
+		}
+		}
+                callSite $\leftarrow$ decide(callTree) \;     
+                  
+
+
+       }
+
+\end{small}
+	\caption{StratifiedInlining$()$
+	\label{scheduler}}
+\end{algorithm2e}
+
+
+
+
+
 
 \end{document}
