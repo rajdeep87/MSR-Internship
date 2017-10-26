@@ -8,6 +8,8 @@ Step 5: To step over skipping functions, press F10.
 
 https://msdn.microsoft.com/en-us/library/y740d9d3.aspx
 
+>> Path to dotty : c:Program Files (x86)\Graphviz2.38-new\bin\dotty.exe
+
 >> Command to print the program (in bpl) after various instrumentation steps and before calling BoogieVerify.verifier 
 C:\MSR-Research\corral>bin\Debug\corral.exe test\regression\test0\main.bpl 
 /flags:test\regression\cex\config /trackAllVars /v:3 /printFinalProg:test\regression\test0\ir.bpl
@@ -338,3 +340,319 @@ Inform Akash
 =============
 Decisions are made during the run of the Stratified Inlining and not upfront. 
 
+
+Interesting cases in Splitsearch that requires new heuristics
+==============================================================
+fdc_fail_irqliopassive1_0.bpl	385203	21672.76	safe	1355.62
+				
+fdc_fail_irqliopassive2_0.bpl		timeout 		2084.63
+				
+fdc_fail_irpprocessingcomplete_0.bpl	1232	2120.2	safe	2084.63
+
+A splitting that does not lead to significant speed-up is due to the fact that 
+there is not much concurrency to exploit. For example, when a split happens, it 
+immediately leads to the UNSAT for the blocking query for example. Hence, the critical 
+path still is complex to solve.
+
+Discussion with Subhajit
+=========================
+start procedure -- VerifyImplementation
+useConcurrentSolver -- check the flag for concurrent (parallel2) or normal SI
+VerifyImplementationConcurrent and VerifyImplementationSI share some methods like VC generation
+public VerifyResult SolvePartition // in stratifiedInlining.cs
+solver.Solve -- creates threads, 
+ConcurrentState -- methods inlined, 
+Each partition has its own SI state, create verificationState with its own copy of SI state 
+One to one mapping between thread to its prover
+public class ProverStackBookkeeping -- maintains prover, how much I need to pop, 
+Blocked decision got expanded further 
+Everytime I solve a partition, it figures out what are the ancester partitions 
+One call tree that is being expanded -- A subtree is one partition -- every split decision creates two child partition -- 
+tree of soft partition -- leaf of softpartition tree will be enqueued in the hierarchicalqueue (worklist)
+Solve a softpartition -- constriants belong 
+Every pop in prover corresponds to popping all context that belongs to inlined tree of softpartition
+Push the software partition of 1 - do split - take another prover -- 
+Dump everything to prover pool -- 
+proverInstance two separate -- 
+Dont pass the "newStratifiedInlining:parallel2"
+>> Try with a small switch-case program with call to various functions -- check what different splitting heuristic is doing ?
+
+Investigation of new heuristic versus old heuristic and conventional SI
+========================================================================
+Ran on a simple if-else program with recursionBound = 100. 
+var x,y,z: int;
+
+procedure top()
+ modifies x;
+ 
+ {
+   
+   x := x + 1;
+
+}
+
+
+procedure foo()
+
+modifies x,y;
+
+{
+   y := 1;
+   
+call top();
+
+}
+
+
+procedure 
+bar()
+
+modifies x,z;
+
+{
+  
+ z := 1;
+   
+ call top();
+
+}
+
+
+
+const N: int;
+
+axiom 0 <= N;
+
+procedure {:entrypoint} main() returns (result: int)
+
+modifies x;
+ 
+{
+   
+ var count: int;
+   
+ x := 0;
+   
+ count := 0;
+   
+ while (count < N) 
+     
+  invariant count <= N;
+   
+ {
+     
+  count := count + 1;
+     
+  result := count;
+    
+ 
+ if (result <= 50) {
+ 
+      call foo();
+     
+  }
+ 
+  else if (result > 50) {
+
+       call bar();
+     
+  }
+
+}
+   
+assert(count >= N);
+   
+assert(x == N);  
+   
+//assert(false);
+
+}
+
+
+Statistics for conventional SI
+==============================
+--------- Stats ---------
+number of functions inlined: 299
+number of splits: 0
+number of backtracking: 0
+total number of assertions in Z3 stack: 0
+total number of Z3 calls: 596
+total time spent in Z3: (tick) 14139
+-------------------------
+Program has no bugs
+Reached recursion bound of 100
+
+Boogie verification time: 75.51 s
+Time spent reading-writing programs: 0.03 s
+
+Time spent checking a program (2): 75.63 s
+Time spent checking a path (3): 0.11 s
+
+Number of procedures inlined: 299
+Number of variables tracked: 2
+Total Time: 75.986703 s
+Total User CPU time: 69.828125 s
+
+Meeting on 15th September
+=========================
+1> Select top k candidates using current heuristic (block all of them in one set) and then 
+(must reach at least one of them in other set). 
+
+2> Create the perfect heuristic example. 
+
+Link to rse server benchmarks
+=============================
+\\rse-server-11\sdvbench\data
+
+Running from rse-server-16 
+==========================
+The top-level script exist in the foler t-ramuk/Sdvbench/runsi
+C:\t-ramuk\sdvbench>binaries2\RunParServer.exe runsi.xml
+Step 1> always copy the new corral to server-16/c:/t-ramuk/sdvbench/corral
+The regression files are in t-ramuk/Sdvbench/data/si_files_nohoudini
+The results are stored in t-ramuk/Sdvbench/results 
+The logfiles are stored in t-ramuk/Sdvbench/SI where SI is the name of the utility
+
+Change the name of the file in the runsi.xml script as follows. 
+ <Files value="data\si_files_nohoudini\1394diag_completerequest_0.bpl"/>
+
+The function that parses the output of corral to produce the results.txt file is “parseOutput”. 
+It is there in CommonLib\Utils.cs. The comment says that the output format is this:
+// corral time, houdini time, SI time, Procs Inlined, Stack depth, Refinements, Outcome
+ 
+
+Implementation of ideal heuristics
+=====================================
+ Console.WriteLine("Entering split ");
+                // Lets split when the tree has become big enough
+                var size = di.ComputeSize();
+                
+                if (treesize == 0 && size > 2)
+                {
+                    Console.WriteLine("Entering split whenever extend is called");
+                    var st = DateTime.Now;
+
+                    // find a node to split on
+                    StratifiedVC maxVc = null;
+                    int maxVcScore = 0;
+
+                    var toRemove = new HashSet<StratifiedVC>();
+                    var sizes = di.ComputeSubtrees();
+                    var disj = di.ComputeNumDisjoint();
+
+                    foreach (var vc1 in attachedVCInv.Keys)
+                    {
+                        var sc = attachedVCInv[vc1];
+                        Console.WriteLine("print stratified call site {0}", sc);
+                        if (!di.VcExists(vc1))
+                        {
+                            toRemove.Add(vc1);
+                            continue;
+                        }
+
+                        /*var score = 1; // Math.Min(sizes[vc].Count, disj[vc]);
+                        if (score >= maxVcScore)
+                        {
+                            maxVc = vc;
+                            maxVcScore = score;
+                        }*/
+                        // } do not end for loop here
+
+                        toRemove.Iter(vc => attachedVCInv.Remove(vc));
+                        Console.WriteLine("looping in maxscore");
+                        var scs = attachedVCInv[vc1];
+                        Debug.Assert(!openCallSites.Contains(scs));
+
+                        var desc = sizes[vc1];
+                        var cnt = 0;
+                        openCallSites.Iter(cs => cnt += desc.Contains(containingVC(cs)) ? 1 : 0);
+
+                        // Push & Block
+                        MacroSI.PRINT("{0}>>> Pushing Block({1}, {2}, {3}, {4})", indent(decisions.Count), scs.callSite.calleeName, sizes[vc1].Count, size, stats.numInlined);
+                        stats.totalSplit++;
+                        var tgNode = string.Format("{0}__{1}", scs.callSite.calleeName, maxVcScore);
+                        timeGraph.AddEdge(tgNode, decisions.Count == 0 ? "" : decisions.Peek().decisionType.ToString());
+
+                        Push();
+                        backtrackingPoints.Push(SiState.SaveState(this, openCallSites));
+                        prevMustAsserted.Push(new List<Tuple<StratifiedVC, Block>>());
+                        decisions.Push(new Decision(DecisionType.BLOCK, 0, scs));
+                        applyDecisionToDI(DecisionType.BLOCK, vc1);
+
+
+                        prover.Assert(scs.callSiteExpr, false);
+                        treesize = di.ComputeSize();
+
+                        tt += (DateTime.Now - st);
+                    }
+                }
+
+TODO:
+Blocktopk-cex does not work with the following example
+C:\MSR-Research\corral\sample-example>..\bin\Debug\corral.exe fdc_fail_iobuilddevicecontrolnofree_0.bpl /v:3 /recursionBound:12 /main:main /sdv /recursionBound:3 /useProverEvaluate /newStratifiedInlining:blocktopk-cex /di /doNotUseLabels > trace
+Another example to try soundness of new heuristic
+C:\MSR-Research\Results\si_files_nohoudini>..\..\corral\bin\Debug\corral.exe sbp2port_ioallocatecomplete_0.bpl /recursionBound:3 /si /useProverEvaluate /newStratifiedInlining:random /di /doNotUseLabels /v:3
+
+Softpartition -- Set of VC, set of open candidates, 
+Each softpartition is handled by one thread 
+softpartition splits into further softpartition -- it forms a tree 
+blockedcandidate and mustreachcandidates -- non-singletons for blocktopk heuristic 
+Each softpartition is queued in the worklist when we have exhausted the number of threads 
+A prover is associated with a softpartition -- each softpartition is a set of VCs
+State of the prover -- 
+Pushing only VC's 
+assertVCForPartition -- call for each softpartition 
+VerificationState -- 
+SP is the logical unit of work to be done, VerificationState is the resources that we need to get the work done 
+ -- Iterate over all softpartition, push all of them candidateUniverse, mustreachset, blockedcandidate 
+ -- Total VC for the partition, put a  
+ -- getMainProver
+ -- StratifiedCallSite splitCand = null; Lie 732
+ -- OptimizedAssertVC -- gets the proverstack in right shape
+  ::taskkill /f /im ..\..\temp\corral\bin\Debug\corral.exe >nul 2>&1
+ ::tasklist /fi "..\..\temp\corral\bin\Debug\corral.exe >nul" | find ":" > nul
+
+assertVCForPartition
+
+<?xml version="1.0" encoding="utf-8" ?>
+<RunParConfig xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Root>C:\t-ramuk\sdvbench</Root>
+  <Utils>
+	  <Util name="minmax" dir="Binaries" exe="RunCorral.exe" arguments="/timeout:2000 /useProverEvaluate /newStratifiedInlining:minmax /di /doNotUseLabels"/>          
+          <Util name="blocktopk" dir="Binaries" exe="RunCorral.exe" arguments="/timeout:2000 /useProverEvaluate /newStratifiedInlining:blocktopk /di /doNotUseLabels"/>
+          <Util name="ideal" dir="Binaries" exe="RunCorral.exe" arguments="/timeout:2000 /useProverEvaluate /newStratifiedInlining:ideal /di /doNotUseLabels"/>
+          <Util name="minmax-cex" dir="Binaries" exe="RunCorral.exe" arguments="/timeout:2000 /useProverEvaluate /newStratifiedInlining:minmax-cex /di /doNotUseLabels"/>
+          <Util name="random" dir="Binaries" exe="RunCorral.exe" arguments="/timeout:2000 /useProverEvaluate /newStratifiedInlining:random /di /doNotUseLabels"/>
+  </Utils>
+  <RemoteRoots>
+    <RemoteFolder value="\\rse-server-12\c$\t-ramuk\tmp"/> 
+    <RemoteFolder value="\\rse-server-14\c$\t-ramuk\tmp"/>
+    <RemoteFolder value="\\rse-server-15\c$\t-ramuk\tmp"/>
+  </RemoteRoots>
+  <Properties>
+  </Properties>
+  <BoogieFiles>
+    <Files value="data\si_files_nohoudini\*.bpl"/>
+  </BoogieFiles>
+
+</RunParConfig>
+
+Example that runs fast with aggressive splitting and not with less aggressive splitting
+=========================================================================================
+..\..\corral\bin\Debug\corral.exe 1394diag_ioallocatecomplete_0.bpl /si /recursionBound:3 /di /doNotUseLabels /newStratifiedInlining:minmax /killAfter:1000
+
+Example that runs fast with non-aggressive splitting and not with more aggressive splitting
+============================================================================================
+..\..\corral\bin\Debug\corral.exe 1394diag_completerequeststatuscheck_0.bpl /si /recursionBound:3 /di /doNotUseLabels /newStratifiedInlining:minmax /killAfter:1000
+191.99 s 
+
+
+Do we need assign softpartition per thread ? Total number of threads.
+Does each softpartition maintain the data-structure attachedVCInv and attachedVC ?
+Why do we need to push partitions in the proverstack ?
+What is the prover. instance in the method assertVCForPartition()
+
+corelib/refinement.cs/line242
+Solve2
+Change stack to list for Split return candidates 
+Change prevmustasserted to list and take union
